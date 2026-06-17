@@ -1,0 +1,54 @@
+from typing import List
+from fastapi import APIRouter, Depends
+from sqlalchemy import func
+from sqlalchemy.orm import Session
+from database import get_db
+from models import User, PredictionResult
+from schemas import ReportSummary, SegmentDistribution, ScoreTrend
+from auth import get_current_user
+
+router = APIRouter(prefix="/reports", tags=["reports"])
+
+@router.get("/summary", response_model=ReportSummary)
+def summary(db: Session = Depends(get_db), _: User = Depends(get_current_user)):
+    total_users = db.query(func.count(User.id)).scalar()
+    total_preds = db.query(func.count(PredictionResult.id)).scalar()
+    avg_score = db.query(func.avg(PredictionResult.score)).scalar() or 0.0
+    high = db.query(func.count(PredictionResult.id)).filter(PredictionResult.segment == "high_intent").scalar()
+    medium = db.query(func.count(PredictionResult.id)).filter(PredictionResult.segment == "medium_intent").scalar()
+    low = db.query(func.count(PredictionResult.id)).filter(PredictionResult.segment == "low_intent").scalar()
+    return ReportSummary(
+        total_users=total_users,
+        total_predictions=total_preds,
+        avg_score=round(float(avg_score), 4),
+        high_intent_count=high,
+        medium_intent_count=medium,
+        low_intent_count=low,
+    )
+
+@router.get("/segments", response_model=List[SegmentDistribution])
+def segments(db: Session = Depends(get_db), _: User = Depends(get_current_user)):
+    rows = (
+        db.query(
+            PredictionResult.segment,
+            func.count(PredictionResult.id).label("count"),
+            func.avg(PredictionResult.score).label("avg_score"),
+        )
+        .group_by(PredictionResult.segment)
+        .all()
+    )
+    return [SegmentDistribution(segment=r.segment, count=r.count, avg_score=round(float(r.avg_score), 4)) for r in rows]
+
+@router.get("/trend", response_model=List[ScoreTrend])
+def trend(db: Session = Depends(get_db), _: User = Depends(get_current_user)):
+    rows = (
+        db.query(
+            func.date(PredictionResult.predicted_at).label("date"),
+            func.avg(PredictionResult.score).label("avg_score"),
+            func.count(PredictionResult.id).label("count"),
+        )
+        .group_by(func.date(PredictionResult.predicted_at))
+        .order_by(func.date(PredictionResult.predicted_at))
+        .all()
+    )
+    return [ScoreTrend(date=str(r.date), avg_score=round(float(r.avg_score), 4), count=r.count) for r in rows]
