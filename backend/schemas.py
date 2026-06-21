@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 from pydantic import BaseModel, EmailStr
 
 class UserCreate(BaseModel):
@@ -84,3 +84,19 @@ class ScoreTrend(BaseModel):
     date: str
     avg_score: float
     count: int
+
+class BatchScoreRequest(BaseModel):
+    behavior_ids: List[int]
+
+class BatchScoreItem(BaseModel):
+    behavior_id: int
+    status: str
+    prediction: Optional[PredictionOut] = None
+    message: Optional[str] = None
+
+class BatchScoreResponse(BaseModel):
+    total: int
+    scored: int
+    skipped: int
+    failed: int
+    results: List[BatchScoreItem]
