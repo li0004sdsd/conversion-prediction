@@ -9,6 +9,7 @@ class User(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     username = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
+    role = Column(String, default="analyst", nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     behaviors = relationship("UserBehavior", back_populates="user", cascade="all, delete-orphan")
     predictions = relationship("PredictionResult", back_populates="user", cascade="all, delete-orphan")
